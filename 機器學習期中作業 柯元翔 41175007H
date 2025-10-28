@@ -1,0 +1,174 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/Sean-Ko/gpt-ai-assistant/blob/main/%E6%A9%9F%E5%99%A8%E5%AD%B8%E7%BF%92%E6%9C%9F%E4%B8%AD%E4%BD%9C%E6%A5%AD%20%E6%9F%AF%E5%85%83%E7%BF%94%2041175007H\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# ====== 訓練模型 ======\n",
+        "import pandas as pd\n",
+        "from sklearn.model_selection import train_test_split\n",
+        "from sklearn.compose import ColumnTransformer\n",
+        "from sklearn.preprocessing import OneHotEncoder\n",
+        "from sklearn.pipeline import Pipeline\n",
+        "from sklearn.ensemble import RandomForestRegressor\n",
+        "import joblib  # 用來儲存模型\n",
+        "\n",
+        "# 1) 讀取資料\n",
+        "URL = \"https://raw.githubusercontent.com/v123582/edu-dataset/main/student-performance-dataset.csv\"\n",
+        "df = pd.read_csv(URL)\n",
+        "\n",
+        "features = [\n",
+        "    \"school\",\"sex\",\"age\",\"address\",\"famsize\",\"Pstatus\",\"Medu\",\"Fedu\",\"Mjob\",\"Fjob\",\n",
+        "    \"reason\",\"guardian\",\"traveltime\",\"studytime\",\"failures\",\"schoolsup\",\"famsup\",\"paid\",\n",
+        "    \"activities\",\"nursery\",\"higher\",\"internet\",\"romantic\",\"famrel\",\"freetime\",\"goout\",\n",
+        "    \"Dalc\",\"Walc\",\"health\",\"absences\",\"G1\",\"G2\"\n",
+        "]\n",
+        "target = \"G3\"\n",
+        "\n",
+        "X = df[features]\n",
+        "y = df[target]\n",
+        "\n",
+        "# 2) 前處理\n",
+        "cat_cols = [\"school\",\"sex\",\"address\",\"famsize\",\"Pstatus\",\"Mjob\",\"Fjob\",\"reason\",\"guardian\",\n",
+        "            \"schoolsup\",\"famsup\",\"paid\",\"activities\",\"nursery\",\"higher\",\"internet\",\"romantic\"]\n",
+        "num_cols = [c for c in features if c not in cat_cols]\n",
+        "\n",
+        "preprocess = ColumnTransformer([\n",
+        "    (\"cat\", OneHotEncoder(handle_unknown=\"ignore\"), cat_cols),\n",
+        "    (\"num\", \"passthrough\", num_cols)\n",
+        "])\n",
+        "\n",
+        "# 3) 切分資料\n",
+        "X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)\n",
+        "\n",
+        "# 4) 建立模型\n",
+        "model = Pipeline([\n",
+        "    (\"prep\", preprocess),\n",
+        "    (\"rf\", RandomForestRegressor(n_estimators=400, random_state=42))\n",
+        "])\n",
+        "\n",
+        "# 5) 訓練模型\n",
+        "model.fit(X_train, y_train)\n",
+        "\n",
+        "# 6) 儲存模型與測試資料\n",
+        "joblib.dump(model, \"student_model.pkl\")\n",
+        "X_test.to_csv(\"X_test.csv\", index=False)\n",
+        "y_test.to_csv(\"y_test.csv\", index=False)\n",
+        "\n",
+        "print(\"✅ 模型訓練完成並已儲存：student_model.pkl\")\n"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "zluz89StwQ8t",
+        "outputId": "a1d5773d-8533-4856-89c2-7782e1114b4d"
+      },
+      "execution_count": 10,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "✅ 模型訓練完成並已儲存：student_model.pkl\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# ====== 預測與評估 ======\n",
+        "import pandas as pd\n",
+        "import numpy as np\n",
+        "from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score\n",
+        "import joblib\n",
+        "\n",
+        "# 1) 載入模型與測試資料\n",
+        "model = joblib.load(\"student_model.pkl\")\n",
+        "X_test = pd.read_csv(\"X_test.csv\")\n",
+        "y_test = pd.read_csv(\"y_test.csv\").squeeze()  # 轉成 Series\n",
+        "\n",
+        "# 2) 預測\n",
+        "y_pred = model.predict(X_test)\n",
+        "\n",
+        "# 3) 評估\n",
+        "mse = mean_squared_error(y_test, y_pred)\n",
+        "rmse = np.sqrt(mse)\n",
+        "mae = mean_absolute_error(y_test, y_pred)\n",
+        "r2 = r2_score(y_test, y_pred)\n",
+        "\n",
+        "print(\"=== 預測結果 ===\")\n",
+        "print(f\"MSE : {mse:.3f}\")\n",
+        "print(f\"RMSE: {rmse:.3f}\")\n",
+        "print(f\"MAE : {mae:.3f}\")\n",
+        "print(f\"R²  : {r2:.3f}\")\n",
+        "\n",
+        "# 4) 顯示前 10 筆預測對照\n",
+        "result = pd.DataFrame({\n",
+        "    \"True_G3\": y_test.reset_index(drop=True),\n",
+        "    \"Pred_G3\": np.round(y_pred, 2)\n",
+        "})\n",
+        "print(\"\\n前 10 筆預測結果：\")\n",
+        "print(result.head(10).to_string(index=False))\n"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "K0km19GTwTZ8",
+        "outputId": "012b3b41-1b39-470b-a40d-172ff8e31c17"
+      },
+      "execution_count": 9,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "=== 預測結果 ===\n",
+            "MSE : 3.947\n",
+            "RMSE: 1.987\n",
+            "MAE : 1.178\n",
+            "R²  : 0.807\n",
+            "\n",
+            "前 10 筆預測結果：\n",
+            " True_G3  Pred_G3\n",
+            "      10     8.23\n",
+            "      12    11.84\n",
+            "       5     6.76\n",
+            "      10     9.71\n",
+            "       9     8.87\n",
+            "      13    12.78\n",
+            "      18    18.78\n",
+            "       6     6.83\n",
+            "       0     7.15\n",
+            "      14    13.27\n"
+          ]
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "colab": {
+      "name": "歡迎使用 Colab",
+      "toc_visible": true,
+      "provenance": [],
+      "include_colab_link": true
+    },
+    "kernelspec": {
+      "display_name": "Python 3",
+      "name": "python3"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 0
+}
